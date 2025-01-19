@@ -118,7 +118,7 @@ impl eframe::App for App {
 				!self.started,
 				Checkbox::new(
 					&mut self.settings.from_first,
-					"verwende ersten Frame als Referenzprunkt",
+					"verwende ersten Frame als Referenzpunkt",
 				),
 			);
 			if !self.started {

@@ -2,7 +2,7 @@ use std::{collections::VecDeque, fs, path::PathBuf, process::Command};
 
 use anyhow::{anyhow, Result};
 use egui::Context;
-use image::{ImageBuffer, Rgb, Rgba};
+use image::{ImageBuffer, Rgba};
 use itertools::Itertools;
 use tempdir::TempDir;
 use tokio::sync::mpsc::Sender;
