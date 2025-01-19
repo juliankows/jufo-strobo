@@ -92,17 +92,7 @@ fn compare(a: &mut Image, b: &Image, threshold: u8) -> Result<()> {
 			} else {
 				0
 			};
-			//let v = if *a > *b { *a - b } else { b - *a };
-			//*a = if v > threshold { 255 } else { 0 }
 		});
-	//a.iter_mut()
-	//	.tuples::<(_, _, _, _)>()
-	//	.for_each(|(r, g, b, a)| {
-	//		let max: u8 = *a.max(b).max(c);
-	//		*a = max;
-	//		*b = max;
-	//		*c = max;
-	//	});
 	Ok(())
 }
 
