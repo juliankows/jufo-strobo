@@ -2,7 +2,7 @@ use std::{collections::VecDeque, fs, path::PathBuf, process::Command};
 
 use anyhow::{anyhow, Result};
 use egui::Context;
-use image::{ImageBuffer, Rgb};
+use image::{ImageBuffer, Rgb, Rgba};
 use itertools::Itertools;
 use tempdir::TempDir;
 use tokio::sync::mpsc::Sender;
@@ -17,7 +17,7 @@ pub struct Settings {
 	pub threshold: u32,
 	//pub denosie: u32,
 }
-type Image = ImageBuffer<Rgb<u8>, Vec<u8>>;
+type Image = ImageBuffer<Rgba<u8>, Vec<u8>>;
 pub async fn start(set: Settings, chan: Sender<Progress>, ctx: &Context) -> Result<Image> {
 	println!("{set:?}");
 	let input = if let Some(input) = set.input_path {
@@ -40,6 +40,10 @@ pub async fn start(set: Settings, chan: Sender<Progress>, ctx: &Context) -> Resu
 			.ok_or(anyhow!("erstes Bild konnte nicht gefunden werden"))?,
 	)?;
 	let mut comptarget = target.clone();
+	target
+		.iter_mut()
+		.tuples::<(_, _, _, _)>()
+		.for_each(|(_, _, _, a)| *a = 0);
 	for (i, f) in images.iter().enumerate() {
 		chan.send(Progress::Compare(i + 1, images.len())).await?;
 		ctx.request_repaint();
@@ -55,25 +59,50 @@ pub async fn start(set: Settings, chan: Sender<Progress>, ctx: &Context) -> Resu
 		}
 		target
 			.iter_mut()
-			.zip(img.iter())
-			.for_each(|(t, s)| *t = t.saturating_add(*s));
+			.tuples::<(_, _, _, _)>()
+			.zip(img.iter().tuples::<(_, _, _, _)>())
+			.for_each(|(t, s)| {
+				if *s.3 > 1 && *t.3 < 1 {
+					*t.0 = *s.0;
+					*t.1 = *s.1;
+					*t.2 = *s.2;
+					*t.3 = 255;
+				}
+			});
 	}
+	target
+		.iter_mut()
+		.tuples::<(_, _, _, _)>()
+		.for_each(|(_, _, _, a)| *a = 255);
 	chan.send(Progress::Finish).await?;
 	ctx.request_repaint();
 	Ok(target)
 }
 
 fn compare(a: &mut Image, b: &Image, threshold: u8) -> Result<()> {
-	a.iter_mut().zip(b.iter()).for_each(|(a, b)| {
-		let v = if *a > *b { *a - b } else { b - *a };
-		*a = if v > threshold { 255 } else { 0 }
-	});
-	a.iter_mut().tuples::<(_, _, _)>().for_each(|(a, b, c)| {
-		let max: u8 = *a.max(b).max(c);
-		*a = max;
-		*b = max;
-		*c = max;
-	});
+	a.iter_mut() // tuples r g b a
+		.tuples::<(_, _, _, _)>()
+		.zip(b.iter().tuples::<(_, _, _, _)>())
+		.for_each(|(a, b)| {
+			let rv = if *a.0 > *b.0 { *a.0 - b.0 } else { b.0 - *a.0 };
+			let gv = if *a.1 > *b.1 { *a.1 - b.1 } else { b.1 - *a.1 };
+			let bv = if *a.2 > *b.2 { *a.2 - b.2 } else { b.2 - *a.2 };
+			*a.3 = if rv > threshold || gv > threshold || bv > threshold {
+				255
+			} else {
+				0
+			};
+			//let v = if *a > *b { *a - b } else { b - *a };
+			//*a = if v > threshold { 255 } else { 0 }
+		});
+	//a.iter_mut()
+	//	.tuples::<(_, _, _, _)>()
+	//	.for_each(|(r, g, b, a)| {
+	//		let max: u8 = *a.max(b).max(c);
+	//		*a = max;
+	//		*b = max;
+	//		*c = max;
+	//	});
 	Ok(())
 }
 
@@ -117,6 +146,6 @@ fn list_images(td: &TempDir) -> Result<VecDeque<PathBuf>> {
 
 fn read_image(file: &PathBuf) -> Result<Image> {
 	let img = image::io::Reader::open(file)?.decode()?;
-	let rgb = img.into_rgb8();
+	let rgb = img.into_rgba8();
 	Ok(rgb)
 }
